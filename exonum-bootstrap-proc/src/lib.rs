@@ -6,9 +6,10 @@
 extern crate quote;
 extern crate proc_macro;
 extern crate syn;
+
 use proc_macro::TokenStream;
 
-#[proc_macro_derive(exonum_record, attributes(key, get, set, size, service, id, transaction, ty))]
+#[proc_macro_derive(exonum_record, attributes(key, get, set, size, service, id, transaction, ty, config))]
 pub fn exonum_record(input: TokenStream) -> TokenStream {
     let input : String = input.to_string();
     let ast = syn::parse_macro_input(&input).expect("Couldn't parse item");
@@ -20,7 +21,7 @@ pub fn exonum_record(input: TokenStream) -> TokenStream {
     result.to_string().parse().expect("Couldn't parse string to tokens")
 }
 
-#[proc_macro_derive(exonum_message, attributes(key, size, service, id, api, ty))]
+#[proc_macro_derive(exonum_message, attributes(key, size, service, id, api, ty, config))]
 pub fn exonum_message(input: TokenStream) -> TokenStream {
     let input : String = input.to_string();
     let ast = syn::parse_macro_input(&input).expect("Couldn't parse item");
@@ -40,9 +41,11 @@ fn make_structure(ast: &syn::MacroInput, variant: &syn::VariantData) -> quote::T
     let api_transaction_name = syn::Ident::new(struct_name.to_string() + &"ApiTransactionRequest".to_string());
     let snake_name = to_snake_case(&struct_name.to_string());
 
-    let api_url = format!("/v1/{}", snake_name);
+    let api_url = "/v1";
     let api_url_transactions = format!("{}/tx", api_url);
+    let api_url_schema = format!("{}/schema", api_url);
 
+    // println!("{:#?}", ast);
 
 
     let (
@@ -130,6 +133,26 @@ fn make_structure(ast: &syn::MacroInput, variant: &syn::VariantData) -> quote::T
         })
     }
 
+    
+    let url = "http://localhost:8000/api/services/{}/v1/schema".to_string().replace("{}", &snake_name);
+    let name_str = struct_name.to_string();
+
+    let mut schema_fields : Vec<quote::Tokens> = Vec::new();
+
+    for index in 0..(names.len()) {
+        let name = names[index].to_string();
+        let ty = types[index].to_string();
+        let size = sizes[index].0.clone();
+
+        schema_fields.push(quote! {
+            SchemaField {
+                name: (#name).to_string(),
+                ty: (#ty).to_string(),
+                size: #size,
+                modificators: None
+            }
+        })
+    }
 
     quote! {
         encoding_struct! {
@@ -148,6 +171,23 @@ fn make_structure(ast: &syn::MacroInput, variant: &syn::VariantData) -> quote::T
             )*
         }
 
+        impl SchemaRecordProvider for #struct_name {
+            fn get_schema() -> Option<SchemaRecord> {
+                Some(SchemaRecord {
+                    name: (#name_str).to_string(),
+                    url: (#url).to_string(),
+                    id: #record_id,
+                    fields: Some(vec![
+                        #(
+                            schema_fields
+                        ),*
+                    ]),
+                    inputs: None,
+                    outputs: None,
+                })
+            }
+        }
+
         pub struct #schema_name <'schema> {
             view: &'schema mut Fork,
         }
@@ -163,8 +203,10 @@ fn make_structure(ast: &syn::MacroInput, variant: &syn::VariantData) -> quote::T
             }
         }
 
+        #[derive(Clone)]
         struct #api_name {
             channel: ApiSender<NodeChannel>,
+            schema: SchemaRecord,
         }
 
         impl Api for #api_name {
@@ -207,8 +249,16 @@ fn make_structure(ast: &syn::MacroInput, variant: &syn::VariantData) -> quote::T
                     }
                 };
 
+                let self_ = self.clone();
+                let schema_handler = move |red: &mut Request| -> IronResult<Response> {
+                    self_.ok_response(&serde_json::to_value(&self_.schema).unwrap())
+                };
+
                 let route_post = #api_url_transactions;
                 router.post(&route_post, transaction, "transaction");
+
+                let route_schema = #api_url_schema;
+                router.get(&route_schema, schema_handler, "schema");
             }
         }
 
@@ -235,6 +285,7 @@ fn make_structure(ast: &syn::MacroInput, variant: &syn::VariantData) -> quote::T
                 let mut router = Router::new();
                 let api = #api_name {
                     channel: ctx.node_channel().clone(),
+                    schema: #struct_name::get_schema().unwrap()
                 };
                 api.wire(&mut router);
                 Some(Box::new(router))

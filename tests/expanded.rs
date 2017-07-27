@@ -1,4 +1,3 @@
-#![feature(box_syntax, test, fmt_internals)]
 #![feature(prelude_import)]
 #![no_std]
 #[prelude_import]
@@ -8,11 +7,11 @@ extern crate std as std;
 #[macro_use]
 extern crate exonum_bootstrap_proc;
 #[macro_use]
+extern crate serde_derive;
+#[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate exonum_bootstrap;
-#[macro_use]
-extern crate serde_derive;
 
 extern crate serde;
 extern crate serde_json;
@@ -22,6 +21,7 @@ extern crate iron;
 
 use exonum_bootstrap::transactions::{TransactionVerify, TransactionExecute};
 use exonum_bootstrap::macroses::*;
+use exonum_bootstrap::schema::*;
 use exonum::blockchain::{self, Blockchain, Service, GenesisConfig,
                          ValidatorKeys, Transaction, ApiContext};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend,
@@ -34,7 +34,6 @@ use exonum::api::{Api, ApiError};
 use iron::prelude::*;
 use iron::Handler;
 use router::Router;
-
 
 // service ID
 // record ID
@@ -52,20 +51,22 @@ struct __Wallet {
 
     // expose setter method `wallet.set_balance(1000u64)`
     #[size = "8"]
+    #[config(max = "10000", min = "0")]
     #[set]
     balance: u64,
 
     #[transaction]
     #[id = "1"]
-    #[ty = "TxCreateWallet"]
-    createWallet: bool,
+    create_wallet: TxCreateWallet,
 
     #[transaction]
     #[id = "2"]
-    #[ty = "TxTransfer"]
-    transfer: bool,
+    transfer: TxTransfer,
 }
 
+// Implementation of custom Wallet record methods
+
+// Usage of auto-generated setter method
 
 
 
@@ -77,6 +78,22 @@ struct __Wallet {
 
 
 
+
+
+// // // // // // // // // // // ENTRY POINT // // // // // // // // // //
+
+
+
+
+
+
+
+
+
+
+// fn main() {
+
+// }
 pub struct Wallet {
     raw: Vec<u8>,
 }
@@ -218,7 +235,7 @@ impl Wallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
+                                                                  ("src/main.rs",
                                                                    28u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
@@ -277,7 +294,7 @@ impl Wallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
+                                                                  ("src/main.rs",
                                                                    28u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
@@ -335,7 +352,7 @@ impl Wallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
+                                                                  ("src/main.rs",
                                                                    28u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
@@ -393,7 +410,7 @@ impl Wallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
+                                                                  ("src/main.rs",
                                                                    28u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
@@ -451,7 +468,7 @@ impl Wallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
+                                                                  ("src/main.rs",
                                                                    28u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
@@ -509,7 +526,7 @@ impl Wallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
+                                                                  ("src/main.rs",
                                                                    28u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
@@ -567,7 +584,7 @@ impl Wallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
+                                                                  ("src/main.rs",
                                                                    28u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
@@ -693,6 +710,39 @@ impl Wallet {
         Field::write(&value, &mut self.raw, 40, 48);
     }
 }
+impl SchemaRecordProvider for Wallet {
+    fn get_schema() -> Option<SchemaRecord> {
+        Some(SchemaRecord{name: ("Wallet").to_string(),
+                          url:
+                              ("http://localhost:8000/api/services/wallet/v1/schema").to_string(),
+                          id: 0,
+                          fields:
+                              Some(<[_]>::into_vec(box
+                                                       [SchemaField{name:
+                                                                        ("pub_key").to_string(),
+                                                                    ty:
+                                                                        ("&PublicKey").to_string(),
+                                                                    size: 32,
+                                                                    modificators:
+                                                                        None,},
+                                                        SchemaField{name:
+                                                                        ("name").to_string(),
+                                                                    ty:
+                                                                        ("&str").to_string(),
+                                                                    size: 8,
+                                                                    modificators:
+                                                                        None,},
+                                                        SchemaField{name:
+                                                                        ("balance").to_string(),
+                                                                    ty:
+                                                                        ("u64").to_string(),
+                                                                    size: 8,
+                                                                    modificators:
+                                                                        None,}])),
+                          inputs: None,
+                          outputs: None,})
+    }
+}
 pub struct WalletSchema<'schema> {
     view: &'schema mut Fork,
 }
@@ -707,12 +757,25 @@ impl <'schema> WalletSchema<'schema> {
 }
 struct WalletApi {
     channel: ApiSender<NodeChannel>,
+    schema: SchemaRecord,
+}
+#[automatically_derived]
+#[allow(unused_qualifications)]
+impl ::std::clone::Clone for WalletApi {
+    #[inline]
+    fn clone(&self) -> WalletApi {
+        match *self {
+            WalletApi { channel: ref __self_0_0, schema: ref __self_0_1 } =>
+            WalletApi{channel: ::std::clone::Clone::clone(&(*__self_0_0)),
+                      schema: ::std::clone::Clone::clone(&(*__self_0_1)),},
+        }
+    }
 }
 impl Api for WalletApi {
     fn wire(&self, router: &mut Router) {
         #[serde(untagged)]
         enum TransactionRequest {
-            createWallet(TxCreateWallet),
+            create_wallet(TxCreateWallet),
             transfer(TxTransfer),
         }
         #[automatically_derived]
@@ -721,8 +784,8 @@ impl Api for WalletApi {
             #[inline]
             fn clone(&self) -> TransactionRequest {
                 match (&*self,) {
-                    (&TransactionRequest::createWallet(ref __self_0),) =>
-                    TransactionRequest::createWallet(::std::clone::Clone::clone(&(*__self_0))),
+                    (&TransactionRequest::create_wallet(ref __self_0),) =>
+                    TransactionRequest::create_wallet(::std::clone::Clone::clone(&(*__self_0))),
                     (&TransactionRequest::transfer(ref __self_0),) =>
                     TransactionRequest::transfer(::std::clone::Clone::clone(&(*__self_0))),
                 }
@@ -740,7 +803,7 @@ impl Api for WalletApi {
                      -> _serde::export::Result<__S::Ok, __S::Error> where
                      __S: _serde::Serializer {
                         match *self {
-                            TransactionRequest::createWallet(ref __field0) =>
+                            TransactionRequest::create_wallet(ref __field0) =>
                             _serde::Serialize::serialize(__field0,
                                                          __serializer),
                             TransactionRequest::transfer(ref __field0) =>
@@ -773,7 +836,7 @@ impl Api for WalletApi {
                         if let _serde::export::Ok(__ok) =
                                _serde::export::Result::map(<TxCreateWallet as
                                                                _serde::Deserialize>::deserialize(_serde::private::de::ContentRefDeserializer::<__D::Error>::new(&__content)),
-                                                           TransactionRequest::createWallet)
+                                                           TransactionRequest::create_wallet)
                                {
                             return _serde::export::Ok(__ok);
                         }
@@ -791,7 +854,7 @@ impl Api for WalletApi {
         impl Into<Box<Transaction>> for TransactionRequest {
             fn into(self) -> Box<Transaction> {
                 match self {
-                    TransactionRequest::createWallet(trans) =>
+                    TransactionRequest::create_wallet(trans) =>
                     Box::new(trans),
                     TransactionRequest::transfer(trans) => Box::new(trans),
                 }
@@ -1034,8 +1097,16 @@ impl Api for WalletApi {
                         Err(ApiError::IncorrectRequest(Box::new(e)))?,
                     }
                 };
-        let route_post = "/v1/wallet/tx";
+        let self_ = self.clone();
+        let schema_handler =
+            move |red: &mut Request| -> IronResult<Response>
+                {
+                    self_.ok_response(&serde_json::to_value(&self_.schema).unwrap())
+                };
+        let route_post = "/v1/tx";
         router.post(&route_post, transaction, "transaction");
+        let route_schema = "/v1/schema";
+        router.get(&route_schema, schema_handler, "schema");
     }
 }
 struct WalletService;
@@ -1057,9 +1128,21 @@ impl Service for WalletService {
     }
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = WalletApi{channel: ctx.node_channel().clone(),};
+        let api =
+            WalletApi{channel: ctx.node_channel().clone(),
+                      schema: Wallet::get_schema().unwrap(),};
         api.wire(&mut router);
         Some(Box::new(router))
+    }
+}
+impl Wallet {
+    pub fn increase(&mut self, amount: u64) {
+        let balance = self.balance() + amount;
+        self.set_balance(balance);
+    }
+    pub fn decrease(&mut self, amount: u64) {
+        let balance = self.balance() - amount;
+        self.set_balance(balance);
     }
 }
 #[api = "WalletApi"]
@@ -1219,8 +1302,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1278,8 +1361,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1336,8 +1419,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1394,8 +1477,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1452,8 +1535,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1526,8 +1609,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1585,8 +1668,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1643,8 +1726,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1701,8 +1784,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -1759,8 +1842,8 @@ impl TxCreateWallet {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   55u32,
+                                                                  ("src/main.rs",
+                                                                   68u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2090,8 +2173,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2149,8 +2232,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2207,8 +2290,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2266,8 +2349,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2324,8 +2407,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2382,8 +2465,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2440,8 +2523,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2498,8 +2581,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2556,8 +2639,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2632,8 +2715,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2691,8 +2774,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2749,8 +2832,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2808,8 +2891,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2866,8 +2949,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2924,8 +3007,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -2982,8 +3065,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -3040,8 +3123,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -3098,8 +3181,8 @@ impl TxTransfer {
                                                                      (&'static str,
                                                                       u32,
                                                                       u32) =
-                                                                  ("tests/bootstrap.rs",
-                                                                   68u32,
+                                                                  ("src/main.rs",
+                                                                   81u32,
                                                                    9u32);
                                                               &_FILE_LINE_COL
                                                           })
@@ -3337,63 +3420,61 @@ impl TransactionExecute for TxCreateWallet {
         }
     }
 }
-#[test]
-pub fn should_bootstrap() {
-    {
-        match (&1, &1) {
-            (left_val, right_val) => {
-                if !(*left_val == *right_val) {
-                    {
-                        ::rt::begin_panic_fmt(&::std::fmt::Arguments::new_v1({
-                                                                                 static __STATIC_FMTSTR:
-                                                                                        &'static [&'static str]
-                                                                                        =
-                                                                                     &["assertion failed: `(left == right)`\n  left: `",
-                                                                                       "`,\n right: `",
-                                                                                       "`"];
-                                                                                 __STATIC_FMTSTR
-                                                                             },
-                                                                             &match (&left_val,
-                                                                                     &right_val)
-                                                                                  {
-                                                                                  (__arg0,
-                                                                                   __arg1)
-                                                                                  =>
-                                                                                  [::std::fmt::ArgumentV1::new(__arg0,
-                                                                                                               ::std::fmt::Debug::fmt),
-                                                                                   ::std::fmt::ArgumentV1::new(__arg1,
-                                                                                                               ::std::fmt::Debug::fmt)],
-                                                                              }),
-                                              {
-                                                  static _FILE_LINE_COL:
-                                                         (&'static str, u32,
-                                                          u32) =
-                                                      ("tests/bootstrap.rs",
-                                                       130u32, 4u32);
-                                                  &_FILE_LINE_COL
-                                              })
-                    }
-                }
-            }
-        }
-    };
-}
-pub mod __test_reexports {
-    pub use super::should_bootstrap;
-}
-pub mod __test {
-    extern crate test;
-    #[main]
-    pub fn main() -> () { test::test_main_static(TESTS) }
-    const TESTS: &'static [self::test::TestDescAndFn] =
-        &[self::test::TestDescAndFn{desc:
-                                        self::test::TestDesc{name:
-                                                                 self::test::StaticTestName("should_bootstrap"),
-                                                             ignore: false,
-                                                             should_panic:
-                                                                 self::test::ShouldPanic::No,
-                                                             allow_fail:
-                                                                 false,},
-                                    testfn:
-                                        self::test::StaticTestFn(::__test_reexports::should_bootstrap),}];
+fn main() {
+    exonum::helpers::init_logger().unwrap();
+    ::io::_print(::std::fmt::Arguments::new_v1({
+                                                   static __STATIC_FMTSTR:
+                                                          &'static [&'static str]
+                                                          =
+                                                       &["Creating in-memory database...\n"];
+                                                   __STATIC_FMTSTR
+                                               }, &match () { () => [], }));
+    let db = MemoryDB::new();
+    let services: Vec<Box<Service>> =
+        <[_]>::into_vec(box [Box::new(WalletService)]);
+    let blockchain = Blockchain::new(Box::new(db), services);
+    let (consensus_public_key, consensus_secret_key) =
+        exonum::crypto::gen_keypair();
+    let (service_public_key, service_secret_key) =
+        exonum::crypto::gen_keypair();
+    let peer_address = "0.0.0.0:2000".parse().unwrap();
+    let api_address = "0.0.0.0:8000".parse().unwrap();
+    let validator_keys =
+        ValidatorKeys{consensus_key: consensus_public_key,
+                      service_key: service_public_key,};
+    let genesis =
+        GenesisConfig::new(<[_]>::into_vec(box [validator_keys]).into_iter());
+    let api_cfg =
+        NodeApiConfig{public_api_address:
+                          Some(api_address), ..Default::default()};
+    let node_cfg =
+        NodeConfig{listen_address: peer_address,
+                   peers: <[_]>::into_vec(box []),
+                   service_public_key,
+                   service_secret_key,
+                   consensus_public_key,
+                   consensus_secret_key,
+                   genesis,
+                   external_address: None,
+                   network: Default::default(),
+                   whitelist: Default::default(),
+                   api: api_cfg,
+                   mempool: Default::default(),
+                   services_configs: Default::default(),};
+    ::io::_print(::std::fmt::Arguments::new_v1({
+                                                   static __STATIC_FMTSTR:
+                                                          &'static [&'static str]
+                                                          =
+                                                       &["Starting a single node...\n"];
+                                                   __STATIC_FMTSTR
+                                               }, &match () { () => [], }));
+    let mut node = Node::new(blockchain, node_cfg);
+    ::io::_print(::std::fmt::Arguments::new_v1({
+                                                   static __STATIC_FMTSTR:
+                                                          &'static [&'static str]
+                                                          =
+                                                       &["Blockchain in ready for transactions!\n"];
+                                                   __STATIC_FMTSTR
+                                               }, &match () { () => [], }));
+    node.run().unwrap();
 }

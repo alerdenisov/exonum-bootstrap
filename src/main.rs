@@ -11,6 +11,7 @@ extern crate iron;
 
 use exonum_bootstrap::transactions::{TransactionVerify,TransactionExecute};
 use exonum_bootstrap::macroses::*;
+use exonum_bootstrap::schema::*;
 use exonum::blockchain::{self, Blockchain, Service, GenesisConfig,
                          ValidatorKeys, Transaction, ApiContext};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend,
@@ -36,22 +37,21 @@ struct __Wallet {
     name: &'static str,
 
     #[size = "8"]
+    #[config(max = "10000", min = "0")]
     #[set]                  // expose setter method `wallet.set_balance(1000u64)`
     balance: u64,
 
     #[transaction]
     #[id="1"]
-    #[ty="TxCreateWallet"]
-    createWallet: bool,
+    create_wallet: TxCreateWallet,
 
     #[transaction]
     #[id="2"]
-    #[ty="TxTransfer"]
-    transfer: bool,
+    transfer: TxTransfer,
 }
 
 // Implementation of custom Wallet record methods
-impl<'wallet> Wallet {
+impl Wallet {
     pub fn increase(&mut self, amount: u64) {
         let balance = self.balance() + amount;
 
@@ -138,84 +138,6 @@ impl TransactionExecute for TxCreateWallet {
     }
 }
 
-// // // // // // // // // // REST API // // // // // // // // // //
-// #[derive(Clone)]
-// struct CryptocurrencyApi {
-//     channel: ApiSender<NodeChannel>,
-// }
-
-// impl Api for CryptocurrencyApi {
-//     fn wire(&self, router: &mut Router) {
-
-//         #[serde(untagged)]
-//         #[derive(Clone, Serialize, Deserialize)]
-//         enum TransactionRequest {
-//             CreateWallet(TxCreateWallet),
-//             Transfer(TxTransfer),
-//         }
-
-//         impl Into<Box<Transaction>> for TransactionRequest {
-//             fn into(self) -> Box<Transaction> {
-//                 match self {
-//                     TransactionRequest::CreateWallet(trans) => Box::new(trans),
-//                     TransactionRequest::Transfer(trans) => Box::new(trans),
-//                 }
-//             }
-//         }
-
-//         #[derive(Serialize, Deserialize)]
-//         struct TransactionResponse {
-//             tx_hash: Hash,
-//         }
-
-//         let self_ = self.clone();
-//         let transaction = move |req: &mut Request| -> IronResult<Response> {
-//             match req.get::<bodyparser::Struct<TransactionRequest>>() {
-//                 Ok(Some(transaction)) => {
-//                     let transaction: Box<Transaction> = transaction.into();
-//                     let tx_hash = transaction.hash();
-//                     self_.channel.send(transaction).map_err(|e| ApiError::Events(e))?;
-//                     let json = TransactionResponse { tx_hash };
-//                     self_.ok_response(&serde_json::to_value(&json).unwrap())
-//                 }
-//                 Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-//                 Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
-//             }
-//         };
-//         let route_post = "/v1/wallets/transaction";
-//         router.post(&route_post, transaction, "transaction");
-//     }
-// }
-
-
-// // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
-// struct CurrencyService;
-
-// impl Service for CurrencyService {
-//     fn service_name(&self) -> &'static str { "cryptocurrency" }
-
-//     fn service_id(&self) -> u16 { 1 }
-
-//     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-//         let trans: Box<Transaction> = match raw.message_type() {
-//             1 => Box::new(TxTransfer::from_raw(raw)?),
-//             2 => Box::new(TxCreateWallet::from_raw(raw)?),
-//             _ => {
-//                 return Err(encoding::Error::IncorrectMessageType { message_type: raw.message_type() });
-//             },
-//         };
-//         Ok(trans)
-//     }
-
-//     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-//         let mut router = Router::new();
-//         let api = CryptocurrencyApi {
-//             channel: ctx.node_channel().clone(),
-//         };
-//         api.wire(&mut router);
-//         Some(Box::new(router))
-//     }
-// }
 
 // // // // // // // // // // // ENTRY POINT // // // // // // // // // //
 

@@ -42,13 +42,26 @@ struct __Wallet {
 
     #[transaction]
     #[id="1"]
-    #[ty="TxCreateWallet"]
-    createWallet: bool,
+    createWallet: TxCreateWallet,
 
     #[transaction]
     #[id="2"]
-    #[ty="TxTransfer"]
-    transfer: bool,
+    transfer: TxTransfer,
+}
+
+// Implementation of custom Wallet record methods
+impl<'wallet> Wallet {
+    pub fn increase(&mut self, amount: u64) {
+        let balance = self.balance() + amount;
+
+        // Usage of auto-generated setter method
+        self.set_balance(balance);
+    }
+
+    pub fn decrease(&mut self, amount: u64) {
+        let balance = self.balance() - amount;
+        self.set_balance(balance);
+    }
 }
 
 

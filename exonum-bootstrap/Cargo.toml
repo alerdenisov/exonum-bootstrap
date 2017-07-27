@@ -1,0 +1,10 @@
+[package]
+name = "exonum_bootstrap"
+version = "0.0.1"
+authors = ["Aler Denisov <aler.zampillo@gmail.com>"]
+description = "Bunch of proc macroses to bootstrap base Exonum services"
+license = "MIT"
+repository = "https://github.com/alerdenisov/exonum-graphql"
+
+[dependencies]
+exonum = "0.1"

@@ -90,7 +90,63 @@ In addition to receiving transactions, the api provides a service scheme:
 
 ```json
 {
-  "schema": "should be here"
+  "id": 1,
+  "inputs": [
+    {
+      "id": 1,
+      "name": "TxCreateWallet",
+      "request": [
+        {
+          "from": 0,
+          "modificators": [
+            {
+              "name": "key",
+              "value": null
+            }
+          ],
+          "name": "pub_key",
+          "size": 32,
+          "to": 32,
+          "ty": "& PublicKey"
+        },
+        {
+          "from": 32,
+          "modificators": null,
+          "name": "name",
+          "size": 8,
+          "to": 40,
+          "ty": "& str"
+        }
+      ],
+      "response": null,
+      "size": 40
+    },
+    ...
+  ],
+  "name": "CurrencyService",
+  "outputs": null,
+  "records": [
+    {
+      "id": 1,
+      "name": "Wallet",
+      "fields": [
+        {
+          "from": 0,
+          "modificators": [
+            {
+              "name": "key",
+              "value": null
+            }
+          ],
+          "name": "pub_key",
+          "size": 32,
+          "to": 32,
+          "ty": "& PublicKey"
+        },
+        ...
+      ]
+    }
+  ]
 }
 ```
 
@@ -101,3 +157,5 @@ Future plans to improvement functionality of Exonum Bootstrap pretty opaque and 
 - [ ] Outputs (read data from blockchain)
 - [ ] Definition of a transactions responses
 - [ ] Configuration of API endpoints 
+- [ ] Cover code with tests...
+- [ ] Detailed docs

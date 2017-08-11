@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/alerdenisov/exonum-graphql"
 
 [dependencies]
-exonum = "0.1"
+exonum = { path = "../../exonum/exonum" }
 serde = "1.0.0"
 serde_json = "1.0"
 serde_derive = "1.0.0"

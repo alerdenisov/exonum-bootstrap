@@ -1,5 +1,6 @@
 target/
 **/*.rs.bk
+**/*.rs.bak
 **/Cargo.lock
 **/.DS_Store
 **/.vscode

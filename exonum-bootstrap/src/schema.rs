@@ -1,25 +1,44 @@
+// Copyright (c) 2017 Aler Denisov <aler.zampillo@gmail.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #[derive(Clone, Serialize)]
 pub struct SchemaService {
     pub name: String,
     pub id: u16,
-    pub records: Option<Vec<SchemaRecord>>
+    pub records: Option<Vec<SchemaRecord>>,
+    pub inputs: Option<Vec<SchemaRequest>>,
+    pub outputs: Option<Vec<SchemaRequest>>    
 }
 
 #[derive(Clone, Serialize)]
 pub struct SchemaRecord {
     pub name: String,
-    pub url: String,
     pub id: u16,
-    pub fields: Option<Vec<SchemaField>>,
-    pub inputs: Option<Vec<SchemaRequest>>,
-    pub outputs: Option<Vec<SchemaRequest>>
+    pub fields: Option<Vec<SchemaField>>
 }
 
 #[derive(Clone, Serialize)]
 pub struct SchemaRequest {
     pub name: String,
     pub id: u16,
-    pub size: u8,
+    pub size: u16,
     pub request: Option<Vec<SchemaField>>,
     pub response: Option<Vec<SchemaField>>,
 }
@@ -28,20 +47,22 @@ pub struct SchemaRequest {
 pub struct SchemaField {
     pub name: String,
     pub ty: String,
-    pub size: u8,
+    pub size: u16,
+    pub from: u16,
+    pub to: u16,
     pub modificators: Option<Vec<FieldModificator>>
 }
 
 #[derive(Clone, Serialize)]
 pub struct FieldModificator {
     pub name: String,
-    pub value: String
+    pub value: Option<String>
 }
 
-pub trait SchemaRecordProvider { fn get_schema() -> Option<SchemaRecord>; }
-pub trait SchemaServiceProvider { fn get_schema() -> Option<SchemaService>; }
-pub trait SchemaRequestProvider { fn get_schema() -> Option<SchemaRequest>; }
-pub trait SchemaFieldProvider { fn get_schema() -> Option<SchemaField>; }
+pub trait SchemaRecordProvider { fn get_schema() -> SchemaRecord; }
+pub trait SchemaServiceProvider { fn get_schema() -> SchemaService; }
+pub trait SchemaRequestProvider { fn get_schema() -> SchemaRequest; }
+pub trait SchemaFieldProvider { fn get_schema() -> SchemaField; }
 
 // impl SchemaRecordProvider for syn::MacroInput {
 //     fn get_schema(&self) -> Option<SchemaRecord> {

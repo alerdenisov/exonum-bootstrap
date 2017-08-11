@@ -1,3 +1,23 @@
+// Copyright (c) 2017 Aler Denisov <aler.zampillo@gmail.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #[macro_use] extern crate exonum_bootstrap_proc;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate exonum;
@@ -9,188 +29,199 @@ extern crate router;
 extern crate bodyparser;
 extern crate iron;
 
-use exonum_bootstrap::transactions::{TransactionVerify,TransactionExecute};
+use serde_json::Value;
+use exonum_bootstrap::transactions::{TransactionMethods};
 use exonum_bootstrap::macroses::*;
 use exonum_bootstrap::schema::*;
-use exonum::blockchain::{self, Blockchain, Service, GenesisConfig,
+use exonum_bootstrap::explorer::*;
+use exonum::blockchain::{self, Schema, Blockchain, Service, GenesisConfig,
                          ValidatorKeys, Transaction, ApiContext};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend,
                    ApiSender, NodeChannel};
 use exonum::messages::{RawTransaction, FromRaw, Message};
-use exonum::storage::{Fork, MemoryDB, MapIndex};
-use exonum::crypto::{PublicKey, Hash};
+use exonum::storage::{Fork, MemoryDB, MapIndex, StorageValue};
+use exonum::crypto::{PublicKey, Hash, HexValue};
 use exonum::encoding::{self, Field};
 use exonum::api::{Api, ApiError};
+use exonum::helpers::fabric::{NodeBuilder, ServiceFactory, Context};
 use iron::prelude::*;
 use iron::Handler;
 use router::Router;
 
+#[derive(exonum_service)]
+#[id = "1"]
+struct __Productivity {
+  #[record]
+  account: __Account,
+
+  #[record]
+  wallet: __Wallet,
+
+  #[record]
+  task: __Task,
+
+  #[record]
+  activity: __Activity,
+
+  // api endpoint for tx (TxCreateWallet)
+  #[input]
+  create_wallet: __CreateAccount,
+
+  #[input]
+  create_task: __CreateTask,
+
+  #[input]
+  create_activity: __CreateActivity
+}
+
 #[derive(exonum_record)]
-#[service = "1"]            // service ID
-#[id = "0"]                 // record ID
+struct __Account {
+  #[key]
+  pub_key: &'static PublicKey,
+
+  #[set]
+  #[size = "8"]
+  name: &'static str,
+}
+
+#[derive(exonum_record)]
 struct __Wallet {
-    #[key]                  // mark field as primary key (will be index of data)
-    #[size = "32"]          // set size in db
-    pub_key: &'static PublicKey,
+  #[key]
+  pub_key: &'static PublicKey,
 
-    #[size = "8"]
-    name: &'static str,
-
-    #[size = "8"]
-    #[config(max = "10000", min = "0")]
-    #[set]                  // expose setter method `wallet.set_balance(1000u64)`
-    balance: u64,
-
-    #[transaction]
-    #[id="1"]
-    create_wallet: TxCreateWallet,
-
-    #[transaction]
-    #[id="2"]
-    transfer: TxTransfer,
+  #[set]
+  balance: u64,
 }
 
-// Implementation of custom Wallet record methods
-impl Wallet {
-    pub fn increase(&mut self, amount: u64) {
-        let balance = self.balance() + amount;
+#[derive(exonum_record)]
+struct __Activity {
+  #[key]
+  key: &'static Hash,
 
-        // Usage of auto-generated setter method
-        self.set_balance(balance);
-    }
+  task_hash: &'static Hash,
 
-    pub fn decrease(&mut self, amount: u64) {
-        let balance = self.balance() - amount;
-        self.set_balance(balance);
-    }
+  worker: &'static PublicKey,
+
+  #[size = "256"]
+  data: &'static str
+}
+
+#[derive(exonum_record)]
+struct __Task {
+  #[key]
+  key: &'static Hash,
+
+  author: &'static PublicKey,  
+
+  worker: &'static PublicKey,
+
+  #[set]
+  #[size = "128"]
+  name: &'static str,
+
+  #[set]
+  open: bool,
+}
+
+
+#[derive(exonum_message)]
+struct __CreateAccount {
+  #[key]
+  #[config(auth)]
+  pub_key: &'static PublicKey,
+
+  #[size = "8"]
+  name: &'static str,
 }
 
 #[derive(exonum_message)]
-#[api="WalletApi"]
-#[service="1"]
-#[id="1"]
-struct __CreateWallet {
-    #[key]
-    #[size = "32"]
-    pub_key: &'static PublicKey,
+struct __CreateTask {
+  #[key]
+  #[config(auth)]
+  pub_key: &'static PublicKey,
+
+  #[config(minLength = "3")]
+  #[size = "24"]
+  name: &'static str,
+
+  #[config(random)]
+  seed: u64
+}
+
+#[derive(exonum_message)]
+struct __CreateActivity {
+  #[key]
+  #[config(auth)]
+  pub_key: &'static PublicKey,
+
+  task_hash: &'static Hash,
+
+  #[size = "256"]
+  map: &'static str,
+
+  #[config(random)]
+  seed: u64
+}
+
+impl TransactionMethods for TxCreateAccount {
+    fn execute(&self, view: &mut Fork) {
+      {
+        let mut accounts_schema = AccountSchema { view };
+        if accounts_schema.get(self.pub_key()).is_none() {
+          let account = Account::new(self.pub_key(), self.name()); 
+          accounts_schema.index().put(self.pub_key(), account);
+        } else {
+          panic!("Account is already created");
+        }
+      }
+      {
+        let mut wallets_schema = WalletSchema { view };
+        let wallet = Wallet::new(self.pub_key(), 0u64);         
+        wallets_schema.index().put(self.pub_key(), wallet);
+      }
+    }
+}
+
+impl TransactionMethods for TxCreateTask {
+  fn verify(&self) -> bool {
+    self.name().len() > 3
+  }
+
+  fn execute(&self, view: &mut Fork) {
+    let mut schema = TaskSchema { view };
+    let task_hash = &StorageValue::hash(&format!("{}_{}", self.pub_key().to_hex(), self.name())); 
     
-    #[size = "8"]
-    name: &'static str,
+    if schema.get(task_hash).is_none() {
+      let task = Task::new(task_hash, self.pub_key(), &PublicKey::zero(), self.name(), false);
+      schema.index().put(task_hash, task);
+    }        
+  }
 }
 
-#[derive(exonum_message)]
-#[api="WalletApi"]
-#[service="1"]
-#[id="2"]
-struct __Transfer {
-    #[key]
-    #[size = "32"]
-    from: &'static PublicKey,
-
-    #[size = "32"]
-    to: &'static PublicKey,
-
-    #[size = "8"]
-    amount: u64,
-
-    #[size = "8"]
-    seed: u64
-}
-
-impl TransactionVerify for TxTransfer {
-    fn verify(&self) -> bool {
-        (*self.from() != *self.to()) && (self.amount() > 0)
+impl TransactionMethods for TxCreateActivity {
+  fn execute(&self, view: &mut Fork) {
+    {
+      let mut task_schema = TaskSchema { view };
+      
+      let task = task_schema.get(self.task_hash());
+      if task.is_none() {
+        panic!("Target task not found");
+      }
     }
+
+    let mut schema = ActivitySchema { view };
+    let activity_hash = &StorageValue::hash(&format!("activity_{}_{}_{}", self.pub_key().to_hex(), self.task_hash().to_hex(), self.seed()));
+    let activity = Activity::new(activity_hash, self.task_hash(), self.pub_key(), self.map());
+    schema.index().put(activity_hash, activity);
+  }
 }
-
-impl TransactionExecute for TxTransfer {
-    fn execute(&self, view: &mut Fork) {
-        let mut schema = WalletSchema { view };
-        let sender = schema.get(self.from());
-        let receiver = schema.get(self.to());
-        if let (Some(mut sender), Some(mut receiver)) = (sender, receiver) {
-            let amount = self.amount();
-            if sender.balance() >= amount {
-                sender.decrease(amount);
-                receiver.increase(amount);
-                let mut wallets = schema.index();
-                wallets.put(self.from(), sender);
-                wallets.put(self.to(), receiver);
-            }
-        }
-    }
-}
-
-impl TransactionVerify for TxCreateWallet {
-    fn verify(&self) -> bool {
-        true
-    }
-}
-
-impl TransactionExecute for TxCreateWallet {
-    fn execute(&self, view: &mut Fork) {
-        let mut schema = WalletSchema { view };
-        if schema.get(self.pub_key()).is_none() {
-            let wallet = Wallet::new(self.pub_key(), self.name(), 1000u64);
-            println!("Create the wallet: {:?}", wallet);
-            schema.index().put(self.pub_key(), wallet)
-        }
-    }
-}
-
-
-// // // // // // // // // // // ENTRY POINT // // // // // // // // // //
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
+    NodeBuilder::new()
+        .with_service::<ProductivityService>()
+        .run();
 
-    println!("Creating in-memory database...");
-    let db = MemoryDB::new();
-    let services: Vec<Box<Service>> = vec![
-        Box::new(WalletService),
-    ];
-    let blockchain = Blockchain::new(Box::new(db), services);
-
-    let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
-    let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
-
-    let peer_address = "0.0.0.0:2000".parse().unwrap();
-    let api_address = "0.0.0.0:8000".parse().unwrap();
-
-    let validator_keys = ValidatorKeys {
-        consensus_key: consensus_public_key,
-        service_key: service_public_key,
-    };
-    let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
-
-    let api_cfg = NodeApiConfig {
-        public_api_address: Some(api_address),
-        ..Default::default()
-    };
-
-    let node_cfg = NodeConfig {
-        listen_address: peer_address,
-        peers: vec![],
-        service_public_key,
-        service_secret_key,
-        consensus_public_key,
-        consensus_secret_key,
-        genesis,
-        external_address: None,
-        network: Default::default(),
-        whitelist: Default::default(),
-        api: api_cfg,
-        mempool: Default::default(),
-        services_configs: Default::default(),
-    };
-
-    println!("Starting a single node...");
-    let mut node = Node::new(blockchain, node_cfg);
-
+        
     println!("Blockchain in ready for transactions!");
-    node.run().unwrap();
 }
-
-// fn main() {
-    
-// }

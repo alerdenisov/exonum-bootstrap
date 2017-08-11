@@ -18,11 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use serde_json::Value;
-use exonum::storage::{Fork};
+pub use self::helpers::*;
+pub use self::schemas::*;
 
-pub trait TransactionMethods { 
-  fn verify(&self) -> bool { true }
-  fn execute(&self, view: &mut Fork); 
-  fn info(&self) -> Value { Value::Null }
-}
+mod helpers;
+mod schemas;
